@@ -1,0 +1,1135 @@
+<!DOCTYPE html>
+<html lang="km">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ប្រព័ន្ធគ្រប់គ្រង និងចុះឈ្មោះភ្ញៀវមង្គលការ - Wedding Guest Manager</title>
+    <!-- Google Fonts: Kantumruy Pro & Hanuman -->
+    <link href="https://fonts.googleapis.com/css2?family=Hanuman:wght@400;700&family=Kantumruy+Pro:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Supabase Client CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- SheetJS (XLSX) CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['"Kantumruy Pro"', 'sans-serif'],
+                        serif: ['"Hanuman"', 'serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Kantumruy Pro', sans-serif;
+            background-color: #fcf8f8;
+            color: #1e293b;
+        }
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+    <!-- Top Status / Configuration Bar -->
+    <div id="demo-banner" class="bg-amber-500/10 border-b border-amber-500/20 px-4 py-2 text-center text-xs text-amber-800 flex items-center justify-center gap-1.5 font-sans">
+        <svg class="w-4 h-4 text-amber-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+        <span>ប្រព័ន្ធដំណើរការក្នុង <strong>លក្ខណៈសាកល្បង (Demo Mode)</strong>។ សូមបំពេញគណនី Supabase ក្នុងផ្ទាំងកំណត់ខាងស្តាំ ដើម្បីភ្ជាប់ជាមួយ Database ពិតប្រាកដ។</span>
+    </div>
+
+    <!-- Header Navigation -->
+    <header class="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-pink-100 shadow-sm px-4 py-3 md:px-8 flex flex-col md:flex-row items-center justify-between gap-4">
+        <div class="flex items-center gap-3">
+            <div class="p-2 bg-pink-100 text-pink-600 rounded-full animate-pulse">
+                <svg class="w-6 h-6 fill-pink-500 stroke-pink-600" viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"></path></svg>
+            </div>
+            <div>
+                <h1 class="text-lg md:text-xl font-bold text-slate-800 tracking-tight font-serif">
+                    ប្រព័ន្ធគ្រប់គ្រងភ្ញៀវមង្គលការ
+                </h1>
+                <p class="text-xs text-slate-500">ចុះឈ្មោះ គ្រប់គ្រងគណនីចងដៃ និងរបាយការណ៍សង្ខេប</p>
+            </div>
+        </div>
+
+        <!-- Navigation Tabs Switcher -->
+        <div class="flex bg-slate-100 p-1 rounded-xl w-full md:w-auto shadow-inner">
+            <button id="tab-btn-guest" onclick="switchTab('guest')" class="flex-1 md:flex-none flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold tracking-wide transition-all bg-white text-pink-600 shadow-sm cursor-pointer">
+                ភ្ញៀវកិត្តិយស (Public)
+            </button>
+            <button id="tab-btn-admin" onclick="switchTab('admin')" class="flex-1 md:flex-none flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold tracking-wide transition-all text-slate-600 hover:text-slate-900 cursor-pointer">
+                គណៈកម្មការ (Admin)
+            </button>
+            <button id="tab-btn-host" onclick="switchTab('host')" class="flex-1 md:flex-none flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold tracking-wide transition-all text-slate-600 hover:text-slate-900 cursor-pointer">
+                ម្ចាស់ពិធី (Host)
+            </button>
+        </div>
+
+        <!-- Dynamic DB Config Toggle button -->
+        <button onclick="toggleConfigDrawer()" class="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 transition-all cursor-pointer">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.58 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.58 4 8 4s8-1.79 8-4M4 7c0-2.21 3.58-4 8-4s8 1.79 8 4m0 5c0 2.21-3.58 4-8 4s-8-1.79-8-4"></path></svg>
+            <span id="db-status-text">Local Demo Mode</span>
+        </button>
+    </header>
+
+    <!-- Configuration Drawer -->
+    <div id="config-drawer" class="hidden bg-slate-900 text-slate-200 border-b border-slate-800 transition-all">
+        <div class="max-w-4xl mx-auto p-6 flex flex-col md:flex-row gap-6 items-start">
+            <div class="flex-1">
+                <h3 class="text-md font-bold text-white flex items-center gap-2 font-serif">
+                    ការកំណត់ការតភ្ជាប់ Supabase
+                </h3>
+                <p class="text-xs text-slate-400 mt-2 leading-relaxed">
+                    បំពេញព័ត៌មាន URL និង Anon Key របស់អ្នកដើម្បីឱ្យប្រព័ន្ធផ្ទុកទិន្នន័យជាក់លាក់នៅលើគណនី Supabase Dashboard របស់អ្នក។
+                </p>
+                <div id="supabase-success-msg" class="hidden mt-3 p-2 text-xs bg-emerald-950 text-emerald-300 border border-emerald-800 rounded-lg">
+                    ការតភ្ជាប់ជោគជ័យ!
+                </div>
+            </div>
+
+            <div class="w-full md:w-96 flex flex-col gap-3">
+                <div>
+                    <label class="block text-xs text-slate-300 mb-1">Supabase URL</label>
+                    <input id="input-sb-url" type="url" placeholder="https://your-project.supabase.co" class="w-full text-xs px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white font-medium">
+                </div>
+                <div>
+                    <label class="block text-xs text-slate-300 mb-1">Supabase Anon Key</label>
+                    <input id="input-sb-key" type="password" placeholder="eyJhbGciOiJIUzI1NiIn..." class="w-full text-xs px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white font-semibold">
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="saveSupabaseConfig()" class="flex-1 text-xs font-bold bg-pink-600 hover:bg-pink-700 text-white py-2 rounded-lg cursor-pointer">រក្សាទុកការតភ្ជាប់</button>
+                    <button onclick="disconnectSupabase()" class="flex-1 text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-300 py-2 rounded-lg cursor-pointer">ប្រើ Demo Mode វិញ</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <main class="flex-1 max-w-4xl mx-auto w-full p-4 md:p-6">
+
+        <!-- ==========================================
+            VIEW 1: PUBLIC GUEST REGISTER FORM
+            ========================================== -->
+        <section id="view-guest" class="space-y-6">
+            <div class="bg-white border border-pink-100 rounded-3xl p-6 shadow-xs text-center space-y-4">
+                <div class="max-w-xs mx-auto">
+                    <label class="block text-xs font-semibold text-slate-500 mb-1.5">សូមជ្រើសរើសពិធីមង្គលការ៖</label>
+                    <select id="guest-wedding-select" onchange="loadWeddingDetails()" class="w-full text-sm font-semibold px-3 py-2 bg-pink-50/50 border border-pink-100 rounded-xl text-pink-700 text-center">
+                        <!-- Options filled dynamically -->
+                    </select>
+                </div>
+
+                <div class="space-y-2 max-w-lg mx-auto">
+                    <h2 id="active-wedding-title" class="text-xl md:text-2xl font-bold font-serif text-slate-800 leading-snug">
+                        ពិធីសិរីសួស្តីអាពាហ៍ពិពាហ៍ សុខា និង ចិន្តា
+                    </h2>
+                    <p class="text-sm text-slate-650 leading-relaxed font-serif">
+                        សូមគោរពអញ្ជើញ ឯកឧត្តម លោកជំទាវ លោកជំទាវ លោកលោកស្រី និងប្រិយមិត្តជិតឆ្ងាយទាំងអស់ ចូលរួមចុះឈ្មោះ និងចងដៃជូនពរដល់គូស្វាមីភរិយាថ្មី។
+                    </p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-12 gap-6">
+                <!-- Registration Form -->
+                <div class="md:col-span-7 bg-white border border-pink-100 rounded-3xl p-6 shadow-xs space-y-5">
+                    <h3 class="text-md font-bold text-slate-800 hover:text-pink-600 flex items-center gap-2 border-b pb-3 font-serif transition-colors">
+                        បញ្ចូលព័ត៌មានចុះឈ្មោះកិត្ដិយស
+                    </h3>
+
+                    <form onsubmit="registerGuest(event)" class="space-y-4">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 mb-1.5">ឈ្មោះភ្ញៀវកិត្តិយស <span class="text-pink-500">*</span></label>
+                            <input id="rsvp-name" type="text" required placeholder="ឧ. សុខ និមល" class="w-full text-sm px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl">
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 mb-1.5">លេខទូរស័ព្ទទំនាក់ទំនង <span class="text-pink-500">*</span></label>
+                            <input id="rsvp-phone" type="tel" required placeholder="ឧ. 012 345 678" class="w-full text-sm px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl">
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 mb-1.5">ចំនួនអ្នកមកជាមួយ (ក្រៅពីសាមីខ្លួន)</label>
+                            <div class="flex items-center gap-2">
+                                <button type="button" onclick="adjustCompanions(-1)" class="w-11 h-11 border border-slate-200 rounded-xl bg-slate-105 font-bold hover:bg-slate-150 cursor-pointer">-</button>
+                                <input id="rsvp-companions" type="number" min="0" value="0" class="flex-1 text-center font-bold text-sm py-3 bg-slate-50 border border-slate-200 rounded-xl">
+                                <button type="button" onclick="adjustCompanions(1)" class="w-11 h-11 border border-slate-200 rounded-xl bg-slate-105 font-bold hover:bg-slate-150 cursor-pointer">+</button>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 mb-1.5">ទំនាក់ទំនងជាមួយម្ចាស់ពិធី</label>
+                            <div class="grid grid-cols-2 gap-2" id="relation-selector">
+                                <button type="button" onclick="selectRelation('ខាងកូនកំលោះ')" class="rel-btn py-2 px-3 text-xs font-semibold rounded-lg border bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100 cursor-pointer">ខាងកូនកំលោះ</button>
+                                <button type="button" onclick="selectRelation('ខាងកូនក្រមុំ')" class="rel-btn py-2 px-3 text-xs font-semibold rounded-lg border bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100 cursor-pointer">ខាងកូនក្រមុំ</button>
+                                <button type="button" onclick="selectRelation('មិត្តភក្តិ')" class="rel-btn py-2 px-3 text-xs font-semibold rounded-lg border bg-pink-50 border-pink-300 text-pink-700 shadow-xs cursor-pointer">មិត្តភក្តិ</button>
+                                <button type="button" onclick="selectRelation('ផ្សេងៗ')" class="rel-btn py-2 px-3 text-xs font-semibold rounded-lg border bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100 cursor-pointer">ផ្សេងៗ</button>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 mb-1.5">ចំនួនទឹកប្រាក់ចងដៃ (ដុល្លារ $) </label>
+                            <input id="rsvp-amount" type="number" min="0" placeholder="ឧ. 50" class="w-full text-sm px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold">
+                            <p class="text-[10px] text-slate-400 mt-1">(ប្រសិនបើចងដៃដោយការស្កេន KHQR ខាងស្តាំ សូមបញ្ចូលទឹកប្រាក់ដែលបានស្កេនរួច)</p>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 mb-1.5 font-sans">កំណត់សម្គាល់ ឬពាក្យជូនពរដល់គូស្វាមីភរិយា</label>
+                            <textarea id="rsvp-note" rows="3" placeholder="សូមជូនពរឱ្យស្រឡាញ់គ្នាដល់ចាស់កោងខ្នង..." class="w-full text-sm px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl"></textarea>
+                        </div>
+
+                        <button type="submit" class="w-full bg-pink-600 hover:bg-pink-700 text-white font-bold py-3.5 px-4 rounded-xl shadow-xs hover:shadow-md transition-all cursor-pointer">
+                            បញ្ជូនការចុះឈ្មោះកិត្ដិយស
+                        </button>
+                    </form>
+                </div>
+
+                <!-- KHQR Code Presentation -->
+                <div class="md:col-span-5 bg-white border border-pink-100 rounded-3xl p-6 shadow-xs flex flex-col justify-between space-y-4">
+                    <div class="text-center space-y-1">
+                        <h3 class="text-md font-bold text-slate-800 font-serif">គណនីស្កេន KHQR ចងដៃ</h3>
+                        <p class="text-xs text-slate-500">លោកអ្នកអាចស្កេន KHQR ដើម្បីចងដៃដោយផ្ទាល់ពីគណនីធនាគារ</p>
+                    </div>
+
+                    <div class="relative aspect-square max-w-xs mx-auto border-4 border-double border-pink-100 rounded-2xl p-2 bg-pink-50/20 flex items-center justify-center">
+                        <img id="active-wedding-qr" src="https://i.ibb.co/3s6qCg3/khqr-demo.png" alt="KHQR Code Image" class="w-full h-full object-contain">
+                    </div>
+
+                    <div class="bg-slate-50 border border-slate-100 p-3 rounded-2xl text-center">
+                        <p class="text-xs text-slate-600 font-medium">ស្គែនរួចរាល់ សូមបំពេញចំនួនទឹកប្រាក់ចងដៃនៅក្នុងទម្រង់បែបបទខាងឆ្វេង ហើយចុចប៊ូតុងចុះឈ្មោះ ដើម្បីឱ្យគណៈកម្មការរៀបចំកត់ត្រា និងអនុម័ត។</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==========================================
+            VIEW 2: ADMIN DASHBOARD (COORDINATOR LIST)
+            ========================================== -->
+        <section id="view-admin" class="hidden space-y-6">
+            
+            <!-- Login Block -->
+            <div id="admin-login-card" class="max-w-md mx-auto bg-white border border-slate-200 rounded-3xl p-8 shadow-xs space-y-6">
+                <div class="text-center space-y-2">
+                    <h2 class="text-xl font-bold text-slate-800 font-serif">គណនីអ្នករៀបចំការងា (Admin Login)</h2>
+                    <p class="text-xs text-slate-500">សូមបញ្ចូលគណនី និងលេខសម្ងាត់ដើម្បីចងទិន្នន័យ</p>
+                </div>
+
+                <form onsubmit="handleAdminLogin(event)" class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">ឈ្មោះគណនី (Username)</label>
+                        <input id="admin-user" type="text" required placeholder="admin123" class="w-full text-xs px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">លេខសម្ងាត់ (Password)</label>
+                        <input id="admin-pass" type="password" required placeholder="••••••••" class="w-full text-xs px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-semibold">
+                    </div>
+                    <button type="submit" class="w-full bg-slate-900 hover:bg-slate-850 text-white font-bold py-3 rounded-xl text-xs cursor-pointer">ចូលទៅកាន់ប្រព័ន្ធគ្រប់គ្រង</button>
+                </form>
+                <div class="bg-amber-50 p-3 border border-amber-200 rounded-xl text-[10px] text-amber-800">
+                    <p>គណនីគំរូ៖ Username: <strong>admin123</strong> | Password: <strong>password123</strong></p>
+                </div>
+            </div>
+
+            <!-- Dashboard Block -->
+            <div id="admin-dashboard-container" class="hidden space-y-6">
+                <!-- User Banner -->
+                <div class="bg-white border border-slate-200 rounded-3xl p-5 shadow-xs flex flex-col md:flex-row gap-4 items-center justify-between">
+                    <div>
+                        <h3 class="text-sm font-bold text-slate-800 font-serif">គណនីសមាជិកគណៈកម្មការ៖ admin123</h3>
+                        <p class="text-[10px] text-slate-500">គ្រប់គ្រង រៀបចំ និងត្រួតពិនិត្យបញ្ជីឈ្មោះភ្ញៀវ</p>
+                    </div>
+                    <div class="flex gap-2 w-full md:w-auto">
+                        <button onclick="toggleElement('admin-wedding-form')" class="bg-pink-50 border border-pink-200 hover:bg-pink-100 text-pink-700 px-3 py-2 rounded-xl text-xs font-bold cursor-pointer">បង្កើតកម្មវិធីមង្គលការ</button>
+                        <button onclick="logoutAdmin()" class="bg-slate-100 border border-slate-250 hover:bg-slate-200 text-slate-600 px-3 py-2 rounded-xl text-xs font-bold cursor-pointer">ចាកចេញ</button>
+                    </div>
+                </div>
+
+                <!-- Create Event Form -->
+                <div id="admin-wedding-form" class="hidden bg-white border border-slate-200 rounded-3xl p-6 shadow-xs space-y-3">
+                    <h4 class="text-sm font-bold text-pink-600 font-serif">បង្កើតកម្មវិធីអាពាហ៍ពិពាហ៍ថ្មី</h4>
+                    <form onsubmit="createNewWedding(event)" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="md:col-span-2">
+                            <label class="block text-xs font-bold text-slate-700 mb-1">ឈ្មោះកម្មវិធីពិធីមង្គលការ *</label>
+                            <input id="wd-title" type="text" required placeholder="ពិធីមង្គលការ សុខ និង ធារី" class="w-full text-xs px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 mb-1">គណនីម្ចាស់ពិធី (Host Username) *</label>
+                            <input id="wd-owner-user" type="text" required placeholder="wedding123" class="w-full text-xs px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 mb-1">លេខសម្ងាត់ម្ចាស់ពិធី *</label>
+                            <input id="wd-owner-pass" type="text" required placeholder="host123" class="w-full text-xs px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl">
+                        </div>
+                        <div class="md:col-span-2">
+                            <label class="block text-xs font-bold text-slate-700 mb-1">ImgBB KHQR Link</label>
+                            <input id="wd-qr-img" type="url" placeholder="https://i.ibb.co/..." class="w-full text-xs px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl">
+                        </div>
+                        <div class="md:col-span-2 flex justify-end gap-2 pt-2">
+                            <button type="button" onclick="toggleElement('admin-wedding-form')" class="text-xs font-bold px-3 py-1.5 border border-slate-200 hover:bg-slate-50 rounded-xl cursor-pointer">បោះបង់</button>
+                            <button type="submit" class="text-xs bg-pink-600 hover:bg-pink-700 text-white font-bold px-4 py-1.5 rounded-xl cursor-pointer">យល់ព្រមបង្កើត</button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Dropdown selector & manual add -->
+                <div class="bg-white border border-slate-200 rounded-3xl p-5 shadow-xs space-y-4">
+                    <div class="flex flex-col md:flex-row gap-4 items-center justify-between">
+                        <div class="w-full md:w-80">
+                            <label class="block text-xs font-bold text-slate-550 mb-1">ជ្រើសរើសពិធីមង្គលការ៖</label>
+                            <select id="admin-wedding-select" onchange="loadAdminGuests()" class="w-full text-sm font-bold text-slate-800 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl">
+                                <!-- Dynamic options -->
+                            </select>
+                        </div>
+                        <button onclick="toggleElement('admin-manual-guest-form')" class="w-full md:w-auto bg-slate-900 text-white text-xs font-bold px-4 py-2.5 rounded-xl hover:bg-slate-800 cursor-pointer">គណៈកម្មការ បន្ថែមឈ្មោះភ្ញៀវផ្ទាល់</button>
+                    </div>
+
+                    <!-- Manual Guest Input Block -->
+                    <div id="admin-manual-guest-form" class="hidden border-t border-slate-100 pt-4">
+                        <form onsubmit="addManualGuest(event)" class="grid grid-cols-1 md:grid-cols-4 gap-3">
+                            <div>
+                                <label class="block text-[10px] font-bold text-slate-600">ឈ្មោះភ្ញៀវ *</label>
+                                <input id="man-name" type="text" required class="w-full text-xs px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-bold text-slate-600">លេខទូរស័ព្ទ *</label>
+                                <input id="man-phone" type="text" required class="w-full text-xs px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-bold text-slate-600">ចំនួនអ្នកមកជាមួយ</label>
+                                <input id="man-comp" type="number" value="0" class="w-full text-xs px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-bold text-slate-600">ទំនាក់ទំនង</label>
+                                <select id="man-rel" class="w-full text-xs px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg">
+                                    <option value="ខាងកូនកំលោះ">ខាងកូនកំលោះ</option>
+                                    <option value="ខាងកូនក្រមុំ">ខាងកូនក្រមុំ</option>
+                                    <option value="មិត្តភក្តិ">មិត្តភក្តិ</option>
+                                    <option value="ផ្សេងៗ">ផ្សេងៗ</option>
+                                </select>
+                            </div>
+                            <div class="md:col-span-2">
+                                <label class="block text-[10px] font-bold text-slate-600">ទឹកប្រាក់ចងដៃ (USD $)</label>
+                                <input id="man-amount" type="number" placeholder="ឧ. 50" class="w-full text-xs px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg">
+                            </div>
+                            <div class="md:col-span-2">
+                                <label class="block text-[10px] font-bold text-slate-600">កំណត់សម្គាល់</label>
+                                <input id="man-note" type="text" class="w-full text-xs px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg">
+                            </div>
+                            <div class="md:col-span-4 flex justify-end gap-1.5">
+                                <button type="button" onclick="toggleElement('admin-manual-guest-form')" class="text-[10px] font-bold px-3 py-1 bg-slate-100 rounded-lg cursor-pointer">បោះបង់</button>
+                                <button type="submit" class="text-[10px] bg-emerald-600 text-white font-bold px-3.5 py-1 rounded-lg cursor-pointer">យល់ព្រមបន្ថែម</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Admin Guest Table UI with filter & search -->
+                <div class="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-xs">
+                    <div class="p-4 bg-slate-50/55 border-b border-slate-150 flex flex-col md:flex-row gap-3 items-center justify-between">
+                        <input id="admin-search" type="text" oninput="loadAdminGuests()" placeholder="ស្វែងរកតាមឈ្មោះ ឬ លេខទូរស័ព្ទ..." class="w-full md:w-72 text-xs px-3 py-2 bg-white border border-slate-200 rounded-lg">
+                        
+                        <div class="flex bg-slate-200/50 p-0.5 rounded-lg text-[10px] font-bold border border-slate-200">
+                            <button onclick="setAdminFilter('all')" id="filter-all" class="px-3 py-1 rounded-md bg-white text-slate-800 shadow-xs cursor-pointer">ទាំងអស់</button>
+                            <button onclick="setAdminFilter('pending')" id="filter-pending" class="px-3 py-1 rounded-md text-slate-600 cursor-pointer">រង់ចាំ</button>
+                            <button onclick="setAdminFilter('approved')" id="filter-approved" class="px-3 py-1 rounded-md text-slate-600 cursor-pointer">អនុម័ត</button>
+                        </div>
+                    </div>
+
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse text-xs text-slate-700">
+                            <thead>
+                                <tr class="bg-slate-100 border-b border-slate-150 font-bold text-slate-600 text-[11px]">
+                                    <th class="py-3 px-4 text-center">ល.រ</th>
+                                    <th class="py-3 px-4">ឈ្មោះភ្ញៀវ</th>
+                                    <th class="py-3 px-4">លេខទូរស័ព្ទ</th>
+                                    <th class="py-3 px-4 text-center">អ្នកមកជាមួយ</th>
+                                    <th class="py-3 px-4">ទំនាក់ទំនង</th>
+                                    <th class="py-3 px-4 text-right">ទឹកប្រាក់ចងដៃ</th>
+                                    <th class="py-3 px-4">ពាក្យជូនពរ</th>
+                                    <th class="py-3 px-4 text-center">ស្ថានភាព</th>
+                                    <th class="py-3 px-4 text-center">សកម្មភាព</th>
+                                </tr>
+                            </thead>
+                            <tbody id="admin-guests-tbody" class="divide-y divide-slate-100">
+                                <!-- Rows filled dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==========================================
+            VIEW 3: HOST DASHBOARD (REPORTS & EXCEL)
+            ========================================== -->
+        <section id="view-host" class="hidden space-y-6">
+            <!-- Host login block -->
+            <div id="host-login-card" class="max-w-md mx-auto bg-white border border-slate-200 rounded-3xl p-8 shadow-xs space-y-6">
+                <div class="text-center space-y-2">
+                    <h2 class="text-xl font-bold text-slate-800 font-serif">គណនីម្ចាស់ពិធី (Bride & Groom Login)</h2>
+                    <p class="text-xs text-slate-500">បញ្ចូលគណនីម្ចាស់ពិធី ដើម្បីចូលរួមពិនិត្យបញ្ជីឈ្មោះ និងគ្រប់គ្រង</p>
+                </div>
+
+                <form onsubmit="handleHostLogin(event)" class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">ឈ្មោះគណនីម្ចាស់ពិធី (Host Username)</label>
+                        <input id="host-user" type="text" required placeholder="wedding123" class="w-full text-sm px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">លេខសម្ងាត់ម្ចាស់ពិធី</label>
+                        <input id="host-pass" type="password" required placeholder="host123" class="w-full text-sm px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl">
+                    </div>
+                    <button type="submit" class="w-full bg-pink-600 hover:bg-pink-700 text-white font-bold py-3 rounded-xl text-xs cursor-pointer">ចូលមើលរបាយការណ៍ និងស្ថិតិ</button>
+                </form>
+                <div class="bg-amber-50 p-3 border border-amber-200 rounded-xl text-[10px] text-amber-800">
+                    <p>គណនីម្ចាស់ពិធីសាកល្បង៖ Username: <strong>wedding123</strong> | Password: <strong>host123</strong></p>
+                </div>
+            </div>
+
+            <!-- Host dashboard detail -->
+            <div id="host-dashboard-container" class="hidden space-y-6">
+                <!-- Host Banner -->
+                <div class="bg-pink-50 border border-pink-100 rounded-3xl p-5 shadow-xs flex flex-col md:flex-row gap-4 items-center justify-between">
+                    <div>
+                        <h3 class="text-sm font-bold text-slate-800 font-serif">សួស្តីសាមីខ្លួនម្ចាស់ពិធីអាពាហ៍ពិពាហ៍! 💖</h3>
+                        <p id="host-event-title" class="text-xs text-pink-705 font-bold font-serif"></p>
+                    </div>
+                    <button onclick="logoutHost()" class="bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 px-4 py-2 rounded-xl text-xs font-bold cursor-pointer">ចាកចេញពីរបាយការណ៍</button>
+                </div>
+
+                <!-- 3 Styled Statistical Cards -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+                    <div class="bg-white border border-slate-100 rounded-3xl p-5 shadow-xs relative overflow-hidden flex flex-col justify-between h-32">
+                        <span class="text-xs font-bold text-slate-500">ចំនួនភ្ញៀវចុះឈ្មោះសរុប</span>
+                        <div>
+                            <span id="metric-total-guests" class="text-3xl font-extrabold text-slate-800 font-mono">0</span>
+                            <span class="text-xs text-slate-500 ml-1 font-bold">នាក់</span>
+                        </div>
+                        <p class="text-[10px] text-slate-400">ភ្ញៀវចុះឈ្មោះទាំងអស់</p>
+                    </div>
+
+                    <div class="bg-white border border-pink-100 rounded-3xl p-5 shadow-xs relative overflow-hidden flex flex-col justify-between h-32">
+                        <span class="text-xs font-bold text-pink-700 font-sans">ចំនួនអ្នកចូលរួមជាក់ស្តែងសរុប</span>
+                        <div>
+                            <span id="metric-total-attendees" class="text-3xl font-extrabold text-pink-600 font-mono">0</span>
+                            <span class="text-xs text-slate-500 ml-1 font-bold">នាក់</span>
+                        </div>
+                        <p class="text-[10px] text-pink-700/60 font-semibold">គិតតែភ្ញៀវដែលបានអនុម័ត + បងប្អូន</p>
+                    </div>
+
+                    <div class="bg-white border border-emerald-100 rounded-3xl p-5 shadow-xs relative overflow-hidden flex flex-col justify-between h-32">
+                        <span class="text-xs font-bold text-emerald-700">ទឹកប្រាក់ចងដៃសរុបទទួលបាន</span>
+                        <div>
+                            <span id="metric-total-gift" class="text-3xl font-extrabold text-emerald-600 font-mono">$0</span>
+                            <span class="text-xs text-slate-500 ml-1 font-bold">USD</span>
+                        </div>
+                        <p class="text-[10px] text-emerald-700/60 font-semibold">គិតតែភ្ញៀវដែលបានអនុម័តរួច</p>
+                    </div>
+                </div>
+
+                <!-- Host Guest Grid Table List -->
+                <div class="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-xs">
+                    <div class="p-4 bg-slate-50 border-b border-slate-150 flex flex-col md:flex-row gap-4 items-center justify-between">
+                        <h4 class="text-sm font-bold text-slate-800 font-serif">បញ្ជីឈ្មោះភ្ញៀវចុះឈ្មោះកិត្ដិយស</h4>
+                        
+                        <div class="flex flex-col md:flex-row gap-2 w-full md:w-auto">
+                            <input id="host-search" type="text" oninput="loadHostGuests()" placeholder="ស្វែងរកតាមឈ្មោះ ឬ លេខទូរស័ព្ទ..." class="w-full md:w-56 text-xs px-3 py-2 bg-white border border-slate-200 rounded-lg">
+                            <button id="excel-btn" onclick="triggerExcelExport()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-2 rounded-xl transition-all h-9 flex items-center justify-center gap-1 cursor-pointer">
+                                <span>ទាញយកឯកសារ Excel (.xlsx)</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse text-xs text-slate-705">
+                            <thead>
+                                <tr class="bg-slate-100 border-b border-slate-150 font-bold text-slate-600 text-[11px]">
+                                    <th class="py-3 px-4 text-center">ល.រ</th>
+                                    <th class="py-3 px-4">ឈ្មោះភ្ញៀវ</th>
+                                    <th class="py-3 px-4">លេខទូរស័ព្ទ</th>
+                                    <th class="py-3 px-4 text-center">អ្នកមកជាមួយ</th>
+                                    <th class="py-3 px-4">ទំនាក់ទំនង</th>
+                                    <th class="py-3 px-4 text-right">ទឹកប្រាក់ចងដៃ</th>
+                                    <th class="py-3 px-4 font-sans">ពាក្យជូនពរ / កំណត់សម្គាល់</th>
+                                    <th class="py-3 px-4 text-center">ស្ថានភាព</th>
+                                </tr>
+                            </thead>
+                            <tbody id="host-guests-tbody" class="divide-y divide-slate-100">
+                                <!-- Filled dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Success Modal Box Dialog -->
+    <div id="rsvp-success-modal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+        <div class="bg-white border border-pink-100 rounded-3xl p-6 md:p-8 max-w-md w-full shadow-2xl text-center space-y-4">
+            <div class="w-16 h-16 bg-pink-105 rounded-full flex items-center justify-center text-pink-600 mx-auto">
+                <svg class="w-10 h-10 text-pink-500 fill-pink-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            </div>
+            
+            <h3 class="text-lg md:text-xl font-bold font-serif text-slate-800">ការចុះឈ្មោះទទួលបានជោគជ័យ! 🎉</h3>
+            <p class="text-xs text-slate-600 leading-relaxed">
+                សូមអរគុណបងប្អូនកិត្តិយសសម្រាប់ការបំពេញព័ត៌មាន និងជូនពរជ័យដល់គូស្វាមីភរិយាថ្មី។ គណៈកម្មការរៀបចំពិធីមង្គលការនឹងត្រួតពិនិត្យ ផ្ទៀងផ្ទាត់ និងអនុម័តបន្តិចទៀតនេះ។
+            </p>
+
+            <button onclick="closeSuccessModal()" class="w-full bg-pink-600 hover:bg-pink-700 text-white font-bold py-3 rounded-xl text-xs transition-colors cursor-pointer">
+                យល់ព្រមបិទ
+            </button>
+        </div>
+    </div>
+
+    <!-- Footer System credits -->
+    <footer class="bg-slate-900 text-slate-400 text-center py-6 text-[11px] border-t border-slate-800 mt-auto font-sans">
+        <p class="font-medium text-slate-300 font-serif">© 2026 គ្រប់គ្រងសិទ្ធិដោយម្ចាស់ពិធីអាពាហ៍ពិពាហ៍</p>
+        <p>ប្រព័ន្ធគ្រប់គ្រង និងចុះឈ្មោះកិត្ដិយសលំដាប់ខ្ពស់</p>
+    </footer>
+
+
+    <!-- ==========================================
+        VANILLA JAVASCRIPT & SUPABASE FLOW ENGINE
+        ========================================== -->
+    <script>
+        // Environment Fallbacks / Config Storage
+        let supabaseUrl = window.env?.SUPABASE_URL || localStorage.getItem('wedding_sb_url') || '';
+        let supabaseAnonKey = window.env?.SUPABASE_ANON_KEY || localStorage.getItem('wedding_sb_key') || '';
+        let dbMode = localStorage.getItem('wedding_db_mode') || 'demo';
+        let supabaseClient = null;
+
+        // In-Memory Seed State for Offline Demo Mode
+        let localAdmins = [
+            { id: 'admin-1', username: 'admin123', password: 'password123' }
+        ];
+
+        let localWeddings = [
+            {
+                id: 'wedding-1',
+                title: 'ពិធីសិរីសួស្តីអាពាហ៍ពិពាហ៍ សុខា និង ចិន្តា',
+                host_username: 'wedding123',
+                host_password: 'host123',
+                khqr_img_url: 'https://i.ibb.co/3s6qCg3/khqr-demo.png'
+            }
+        ];
+
+        let localGuests = [
+            { id: 'guest-1', wedding_id: 'wedding-1', name: 'ចាន់ សុភ័ក្រ', phone: '012345678', companions: 2, relation_type: 'ខាងកូនកំលោះ', amount: 50, note: 'សូមជូនពរឱ្យអ្នកទាំងពីរស្រឡាញ់គ្នាដល់ចាស់កោងខ្នង!', status: 'approved', created_at: new Date().toISOString() },
+            { id: 'guest-2', wedding_id: 'wedding-1', name: 'លី ម៉ារីណា', phone: '099887766', companions: 0, relation_type: 'ខាងកូនក្រមុំ', amount: 30, note: 'រីករាយថ្ងៃអាពាហ៍ពិពាហ៍!', status: 'pending', created_at: new Date().toISOString() }
+        ];
+
+        // Active State Selection
+        let selectedWeddingId = 'wedding-1';
+        let rsvpRelationType = 'មិត្តភក្តិ';
+        let adminFilter = 'all';
+        let activeAdminWeddingId = 'wedding-1';
+        let activeHostWedding = null;
+
+        // Load Persistent local state if stored
+        if (localStorage.getItem('local_weddings_db')) {
+            localWeddings = JSON.parse(localStorage.getItem('local_weddings_db'));
+        }
+        if (localStorage.getItem('local_guests_db')) {
+            localGuests = JSON.parse(localStorage.getItem('local_guests_db'));
+        }
+
+        // Initialize Supabase if variables exist
+        function initSupabase() {
+            if (dbMode === 'supabase' && supabaseUrl && supabaseAnonKey) {
+                try {
+                    supabaseClient = supabase.createClient(supabaseUrl, supabaseAnonKey);
+                    document.getElementById('db-status-text').innerText = 'Supabase Connected';
+                    document.getElementById('db-status-text').parentElement.className = 'flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 transition-all';
+                    document.getElementById('demo-banner').classList.add('hidden');
+                } catch (e) {
+                    console.error("Connection failed", e);
+                    dbMode = 'demo';
+                }
+            } else {
+                document.getElementById('db-status-text').innerText = 'Local Demo Mode';
+                document.getElementById('db-status-text').parentElement.className = 'flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200 transition-all';
+                document.getElementById('demo-banner').classList.remove('hidden');
+            }
+        }
+
+        // Save local databases to localStorage
+        function saveLocalDatabases() {
+            localStorage.setItem('local_weddings_db', JSON.stringify(localWeddings));
+            localStorage.setItem('local_guests_db', JSON.stringify(localGuests));
+        }
+
+        // UI Tabs routing
+        function switchTab(tab) {
+            document.getElementById('view-guest').classList.add('hidden');
+            document.getElementById('view-admin').classList.add('hidden');
+            document.getElementById('view-host').classList.add('hidden');
+
+            document.getElementById('tab-btn-guest').className = 'flex-1 md:flex-none flex items-center justify-center gap-1 px-4 py-2 rounded-lg text-xs font-semibold transition-all text-slate-650 hover:text-slate-900 cursor-pointer';
+            document.getElementById('tab-btn-admin').className = 'flex-1 md:flex-none flex items-center justify-center gap-1 px-4 py-2 rounded-lg text-xs font-semibold transition-all text-slate-650 hover:text-slate-900 cursor-pointer';
+            document.getElementById('tab-btn-host').className = 'flex-1 md:flex-none flex items-center justify-center gap-1 px-4 py-2 rounded-lg text-xs font-semibold transition-all text-slate-650 hover:text-slate-900 cursor-pointer';
+
+            if (tab === 'guest') {
+                document.getElementById('view-guest').classList.remove('hidden');
+                document.getElementById('tab-btn-guest').className = 'flex-1 md:flex-none flex items-center justify-center gap-1 px-4 py-2 rounded-lg text-xs font-semibold transition-all bg-white text-pink-600 shadow-sm cursor-pointer';
+                loadWeddingDetails();
+            } else if (tab === 'admin') {
+                document.getElementById('view-admin').classList.remove('hidden');
+                document.getElementById('tab-btn-admin').className = 'flex-1 md:flex-none flex items-center justify-center gap-1 px-4 py-2 rounded-lg text-xs font-semibold transition-all bg-white text-slate-800 shadow-sm cursor-pointer';
+                loadAdminDashboard();
+            } else if (tab === 'host') {
+                document.getElementById('view-host').classList.remove('hidden');
+                document.getElementById('tab-btn-host').className = 'flex-1 md:flex-none flex items-center justify-center gap-1 px-4 py-2 rounded-lg text-xs font-semibold transition-all bg-white text-slate-800 shadow-sm cursor-pointer';
+                loadHostDashboard();
+            }
+        }
+
+        // Toggle configuration drawer
+        function toggleConfigDrawer() {
+            const drawer = document.getElementById('config-drawer');
+            drawer.classList.toggle('hidden');
+            document.getElementById('input-sb-url').value = supabaseUrl;
+            document.getElementById('input-sb-key').value = supabaseAnonKey;
+        }
+
+        function toggleElement(id) {
+            document.getElementById(id).classList.toggle('hidden');
+        }
+
+        // Save Supabase credentials entered
+        function saveSupabaseConfig() {
+            const url = document.getElementById('input-sb-url').value.trim();
+            const key = document.getElementById('input-sb-key').value.trim();
+            if (!url || !key) {
+                alert("សូមបញ្ចូលតំណភ្ជាប់ និង Anon-key ឲ្យបានត្រឹមត្រូវ!");
+                return;
+            }
+            supabaseUrl = url;
+            supabaseAnonKey = key;
+            dbMode = 'supabase';
+            localStorage.setItem('wedding_sb_url', url);
+            localStorage.setItem('wedding_sb_key', key);
+            localStorage.setItem('wedding_db_mode', 'supabase');
+
+            initSupabase();
+            document.getElementById('supabase-success-msg').classList.remove('hidden');
+            setTimeout(() => {
+                document.getElementById('supabase-success-msg').classList.add('hidden');
+                toggleConfigDrawer();
+                reloadData();
+            }, 1000);
+        }
+
+        function disconnectSupabase() {
+            dbMode = 'demo';
+            localStorage.setItem('wedding_db_mode', 'demo');
+            initSupabase();
+            toggleConfigDrawer();
+            reloadData();
+        }
+
+        // Reload data from active target database
+        async function reloadData() {
+            if (dbMode === 'supabase' && supabaseClient) {
+                try {
+                    let { data: wList, error: wErr } = await supabaseClient.from('weddings').select('*');
+                    if (wErr) throw wErr;
+                    let { data: gList, error: gErr } = await supabaseClient.from('guests').select('*');
+                    if (gErr) throw gErr;
+                    
+                    if (wList && wList.length > 0) {
+                        localWeddings = wList;
+                    }
+                    if (gList) {
+                        localGuests = gList;
+                    }
+                } catch(e) {
+                    console.error("Error reloading database, falling back to local dataset", e);
+                    dbMode = 'demo';
+                }
+            }
+            populateWeddingSelectors();
+            loadWeddingDetails();
+        }
+
+        // RSVP Forms helpers
+        function adjustCompanions(amount) {
+            const el = document.getElementById('rsvp-companions');
+            let val = parseInt(el.value) || 0;
+            val = Math.max(0, val + amount);
+            el.value = val;
+        }
+
+        function selectRelation(rel) {
+            rsvpRelationType = rel;
+            const buttons = document.querySelectorAll('.rel-btn');
+            buttons.forEach(b => {
+                if (b.innerText === rel) {
+                    b.className = 'rel-btn py-2 px-3 text-xs font-semibold rounded-lg border bg-pink-50 border-pink-300 text-pink-700 shadow-sm cursor-pointer';
+                } else {
+                    b.className = 'rel-btn py-2 px-3 text-xs font-semibold rounded-lg border bg-slate-50 border-slate-200 text-slate-650 hover:bg-slate-100 cursor-pointer';
+                }
+            });
+        }
+
+        // Dropdowns filling
+        function populateWeddingSelectors() {
+            const guestSelect = document.getElementById('guest-wedding-select');
+            const adminSelect = document.getElementById('admin-wedding-select');
+            
+            guestSelect.innerHTML = '';
+            adminSelect.innerHTML = '';
+
+            localWeddings.forEach(w => {
+                const opt1 = document.createElement('option');
+                opt1.value = w.id;
+                opt1.innerText = w.title;
+                guestSelect.appendChild(opt1);
+
+                const opt2 = document.createElement('option');
+                opt2.value = w.id;
+                opt2.innerText = w.title;
+                adminSelect.appendChild(opt2);
+            });
+        }
+
+        function loadWeddingDetails() {
+            const select = document.getElementById('guest-wedding-select');
+            selectedWeddingId = select.value || (localWeddings[0] ? localWeddings[0].id : '');
+            
+            const w = localWeddings.find(item => item.id == selectedWeddingId);
+            if (w) {
+                document.getElementById('active-wedding-title').innerText = w.title;
+                document.getElementById('active-wedding-qr').src = w.khqr_img_url || 'https://i.ibb.co/3s6qCg3/khqr-demo.png';
+            }
+        }
+
+        // RSVP action
+        async function registerGuest(e) {
+            e.preventDefault();
+            const name = document.getElementById('rsvp-name').value.trim();
+            const phone = document.getElementById('rsvp-phone').value.trim();
+            const companions = parseInt(document.getElementById('rsvp-companions').value) || 0;
+            const amount = parseFloat(document.getElementById('rsvp-amount').value) || 0;
+            const note = document.getElementById('rsvp-note').value.trim();
+
+            if (!name || !phone) {
+                alert("សូមបញ្ចូលឈ្មោះ និងលេខទូរស័ព្ទរបស់អ្នក!");
+                return;
+            }
+
+            const guestData = {
+                wedding_id: selectedWeddingId,
+                name: name,
+                phone: phone,
+                companions: companions,
+                relation_type: rsvpRelationType,
+                amount: amount,
+                note: note,
+                status: 'pending'
+            };
+
+            if (dbMode === 'supabase' && supabaseClient) {
+                try {
+                    const { data, error } = await supabaseClient.from('guests').insert([guestData]);
+                    if (error) throw error;
+                    await reloadData();
+                } catch(err) {
+                    alert("កំហុសក្នុងការចុះឈ្មោះ Supabase: " + err.message);
+                    return;
+                }
+            } else {
+                // Local Mode
+                const newGuest = {
+                    ...guestData,
+                    id: 'guest-' + Date.now(),
+                    created_at: new Date().toISOString()
+                };
+                localGuests.unshift(newGuest);
+                saveLocalDatabases();
+            }
+
+            // Reset Form Values
+            document.getElementById('rsvp-name').value = '';
+            document.getElementById('rsvp-phone').value = '';
+            document.getElementById('rsvp-companions').value = '0';
+            document.getElementById('rsvp-amount').value = '';
+            document.getElementById('rsvp-note').value = '';
+
+            // Open popup modal Success
+            document.getElementById('rsvp-success-modal').classList.remove('hidden');
+        }
+
+        function closeSuccessModal() {
+            document.getElementById('rsvp-success-modal').classList.add('hidden');
+        }
+
+        // ==========================================
+        // ADMIN DASHBOARD FLOW FUNCTIONS
+        // ==========================================
+        let adminLoggedIn = false;
+
+        function loadAdminDashboard() {
+            if (adminLoggedIn) {
+                document.getElementById('admin-login-card').classList.add('hidden');
+                document.getElementById('admin-dashboard-container').classList.remove('hidden');
+                populateWeddingSelectors();
+                loadAdminGuests();
+            } else {
+                document.getElementById('admin-login-card').classList.remove('hidden');
+                document.getElementById('admin-dashboard-container').classList.add('hidden');
+            }
+        }
+
+        function handleAdminLogin(e) {
+            e.preventDefault();
+            const user = document.getElementById('admin-user').value.trim();
+            const pass = document.getElementById('admin-pass').value.trim();
+
+            if (user === 'admin123' && pass === 'password123') {
+                adminLoggedIn = true;
+                loadAdminDashboard();
+            } else {
+                alert("ឈ្មោះគណនី ឬលេខសម្ងាត់មិនត្រឹមត្រូវទេ!");
+            }
+        }
+
+        function logoutAdmin() {
+            adminLoggedIn = false;
+            loadAdminDashboard();
+        }
+
+        // Create a new Wedding event in Admin View
+        async function createNewWedding(e) {
+            e.preventDefault();
+            const title = document.getElementById('wd-title').value.trim();
+            const hostUser = document.getElementById('wd-owner-user').value.trim();
+            const hostPass = document.getElementById('wd-owner-pass').value.trim();
+            const qrImg = document.getElementById('wd-qr-img').value.trim() || 'https://i.ibb.co/3s6qCg3/khqr-demo.png';
+
+            if (!title || !hostUser || !hostPass) {
+                alert("សូមបំពេញព័ត៌មានចាំបាច់ឲ្យបានគ្រប់គ្រាន់!");
+                return;
+            }
+
+            const weddingData = {
+                title: title,
+                host_username: hostUser,
+                host_password: hostPass,
+                khqr_img_url: qrImg
+            };
+
+            if (dbMode === 'supabase' && supabaseClient) {
+                try {
+                    const { error } = await supabaseClient.from('weddings').insert([weddingData]);
+                    if (error) throw error;
+                    await reloadData();
+                } catch(err) {
+                    alert("កំហុសក្នុងការបង្កើត Supabase: " + err.message);
+                    return;
+                }
+            } else {
+                const newWedding = {
+                    ...weddingData,
+                    id: 'wedding-' + Date.now(),
+                    created_at: new Date().toISOString()
+                };
+                localWeddings.push(newWedding);
+                saveLocalDatabases();
+            }
+
+            document.getElementById('wd-title').value = '';
+            document.getElementById('wd-owner-user').value = '';
+            document.getElementById('wd-owner-pass').value = '';
+            document.getElementById('wd-qr-img').value = '';
+            document.getElementById('admin-wedding-form').classList.add('hidden');
+            
+            alert("កម្មវិធីមង្គលការថ្មីត្រូវបានបង្កើតឡើងដោយជោគជ័យ! 🎉");
+            reloadData();
+        }
+
+        // Manual Guest added by coordinator
+        async function addManualGuest(e) {
+            e.preventDefault();
+            const activeId = document.getElementById('admin-wedding-select').value;
+            const name = document.getElementById('man-name').value.trim();
+            const phone = document.getElementById('man-phone').value.trim();
+            const comp = parseInt(document.getElementById('man-comp').value) || 0;
+            const amount = parseFloat(document.getElementById('man-amount').value) || 0;
+            const note = document.getElementById('man-note').value.trim();
+            const rel = document.getElementById('man-rel').value;
+
+            if (!name || !phone) {
+                alert("សូមបំពេញឈ្មោះ និងលេខទូរស័ព្ទភ្ញៀវ!");
+                return;
+            }
+
+            const guestData = {
+                wedding_id: activeId,
+                name: name,
+                phone: phone,
+                companions: comp,
+                relation_type: rel,
+                amount: amount,
+                note: note,
+                status: 'approved' // Auto approved by admin
+            };
+
+            if (dbMode === 'supabase' && supabaseClient) {
+                try {
+                    const { error } = await supabaseClient.from('guests').insert([guestData]);
+                    if (error) throw error;
+                    await reloadData();
+                } catch(err) {
+                    alert("កំហុស Supabase: " + err.message);
+                    return;
+                }
+            } else {
+                const newG = {
+                    ...guestData,
+                    id: 'guest-' + Date.now(),
+                    created_at: new Date().toISOString()
+                };
+                localGuests.unshift(newG);
+                saveLocalDatabases();
+            }
+
+            document.getElementById('man-name').value = '';
+            document.getElementById('man-phone').value = '';
+            document.getElementById('man-comp').value = '0';
+            document.getElementById('man-amount').value = '';
+            document.getElementById('man-note').value = '';
+            document.getElementById('admin-manual-guest-form').classList.add('hidden');
+            
+            alert("បានបញ្ចូលភ្ញៀវដោយជោគជ័យ! 🎉");
+            loadAdminGuests();
+        }
+
+        function setAdminFilter(filter) {
+            adminFilter = filter;
+            document.getElementById('filter-all').className = 'px-3 py-1 rounded-md text-slate-650 cursor-pointer';
+            document.getElementById('filter-pending').className = 'px-3 py-1 rounded-md text-slate-650 cursor-pointer';
+            document.getElementById('filter-approved').className = 'px-3 py-1 rounded-md text-slate-650 cursor-pointer';
+            
+            document.getElementById('filter-' + filter).className = 'px-3 py-1 rounded-md bg-white text-slate-800 shadow-xs cursor-pointer';
+            loadAdminGuests();
+        }
+
+        async function approveGuest(id) {
+            if (dbMode === 'supabase' && supabaseClient) {
+                try {
+                    const { error } = await supabaseClient.from('guests').update({ status: 'approved' }).eq('id', id);
+                    if (error) throw error;
+                    await reloadData();
+                } catch(e) {
+                    alert("បរាជ័យ: " + e.message);
+                    return;
+                }
+            } else {
+                const g = localGuests.find(item => item.id == id);
+                if (g) g.status = 'approved';
+                saveLocalDatabases();
+            }
+            loadAdminGuests();
+        }
+
+        async function deleteGuest(id) {
+            if (!confirm("តើអ្នកប្រាកដជាចង់លុបព័ត៌មានភ្ញៀវម្នាក់នេះឬ?")) return;
+
+            if (dbMode === 'supabase' && supabaseClient) {
+                try {
+                    const { error } = await supabaseClient.from('guests').delete().eq('id', id);
+                    if (error) throw error;
+                    await reloadData();
+                } catch(e) {
+                    alert("បរាជ័យ: " + e.message);
+                    return;
+                }
+            } else {
+                localGuests = localGuests.filter(item => item.id != id);
+                saveLocalDatabases();
+            }
+            loadAdminGuests();
+        }
+
+        function loadAdminGuests() {
+            const activeWdId = document.getElementById('admin-wedding-select').value;
+            const search = document.getElementById('admin-search').value.toLowerCase();
+            const tbody = document.getElementById('admin-guests-tbody');
+            tbody.innerHTML = '';
+
+            const filtered = localGuests.filter(g => {
+                if (g.wedding_id != activeWdId) return false;
+                const matchesSearch = g.name.toLowerCase().includes(search) || g.phone.includes(search);
+                const matchesFilter = adminFilter === 'all' ? true : g.status === adminFilter;
+                return matchesSearch && matchesFilter;
+            });
+
+            if (filtered.length === 0) {
+                tbody.innerHTML = `<tr><td colSpan="9" class="py-8 text-center text-slate-400 font-medium">មិនមានឈ្មោះភ្ញៀវកត់ត្រាឡើយ។</td></tr>`;
+                return;
+            }
+
+            filtered.forEach((g, index) => {
+                const r = document.createElement('tr');
+                r.className = 'hover:bg-slate-50 transition-colors border-b border-slate-100';
+                
+                const approveBtn = g.status === 'pending'
+                    ? `<button onclick="approveGuest('${g.id}')" class="bg-emerald-50 border border-emerald-200 text-emerald-700 px-2 py-0.5 rounded text-[10px] font-bold cursor-pointer hover:bg-emerald-100">អនុម័ត</button>`
+                    : '';
+
+                r.innerHTML = `
+                    <td class="py-3 px-4 text-center text-slate-400 font-semibold">${index + 1}</td>
+                    <td class="py-3 px-4 font-bold text-slate-900">${g.name}</td>
+                    <td class="py-3 px-4 font-mono">${g.phone}</td>
+                    <td class="py-3 px-4 text-center font-bold">${g.companions} នាក់</td>
+                    <td class="py-3 px-4"><span class="px-2 py-0.5 rounded bg-slate-100 text-slate-700 font-bold text-[10px]">${g.relation_type}</span></td>
+                    <td class="py-3 px-4 text-right font-bold text-emerald-600 font-mono">$${g.amount}</td>
+                    <td class="py-3 px-4 truncate max-w-xs italic text-slate-500" title="${g.note || ''}">${g.note || '-'}</td>
+                    <td class="py-3 px-4 text-center">
+                        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${g.status === 'approved' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}">
+                            ${g.status === 'approved' ? 'យល់ព្រម' : 'រង់ចាំ'}
+                        </span>
+                    </td>
+                    <td class="py-3 px-4 text-center">
+                        <div class="flex gap-1.5 justify-center">
+                            ${approveBtn}
+                            <button onclick="deleteGuest('${g.id}')" class="bg-rose-50 border border-rose-200 text-rose-700 px-2.5 py-0.5 rounded text-[10px] font-bold cursor-pointer hover:bg-rose-100">លុប</button>
+                        </div>
+                    </td>
+                `;
+                tbody.appendChild(r);
+            });
+        }
+
+        // ==========================================
+        // HOST REPORTS DETAILS FUNCTIONS
+        // ==========================================
+        function loadHostDashboard() {
+            if (activeHostWedding) {
+                document.getElementById('host-login-card').classList.add('hidden');
+                document.getElementById('host-dashboard-container').classList.remove('hidden');
+                document.getElementById('host-event-title').innerText = activeHostWedding.title;
+                loadHostGuests();
+            } else {
+                document.getElementById('host-login-card').classList.remove('hidden');
+                document.getElementById('host-dashboard-container').classList.add('hidden');
+            }
+        }
+
+        function handleHostLogin(e) {
+            e.preventDefault();
+            const user = document.getElementById('host-user').value.trim();
+            const pass = document.getElementById('host-pass').value.trim();
+
+            const found = localWeddings.find(w => w.host_username === user && w.host_password === pass);
+            if (found) {
+                activeHostWedding = found;
+                loadHostDashboard();
+            } else {
+                alert("គណនី ឬលេខសម្ងាត់របស់ម្ចាស់ពិធីមិនត្រឹមត្រូវទេ!");
+            }
+        }
+
+        function logoutHost() {
+            activeHostWedding = null;
+            loadHostDashboard();
+        }
+
+        function loadHostGuests() {
+            if (!activeHostWedding) return;
+            const search = document.getElementById('host-search').value.toLowerCase();
+            const tbody = document.getElementById('host-guests-tbody');
+            tbody.innerHTML = '';
+
+            const filtered = localGuests.filter(g => {
+                if (g.wedding_id != activeHostWedding.id) return false;
+                return g.name.toLowerCase().includes(search) || g.phone.includes(search);
+            });
+
+            // Calculate Metrics
+            const totalGuests = filtered.length;
+            const approvedList = filtered.filter(g => g.status === 'approved');
+            const actualTotal = approvedList.reduce((sum, g) => sum + 1 + g.companions, 0);
+            const totalGift = approvedList.reduce((sum, g) => sum + g.amount, 0);
+
+            document.getElementById('metric-total-guests').innerText = totalGuests;
+            document.getElementById('metric-total-attendees').innerText = actualTotal;
+            document.getElementById('metric-total-gift').innerText = '$' + totalGift.toLocaleString();
+
+            if (filtered.length === 0) {
+                tbody.innerHTML = `<tr><td colSpan="8" class="py-8 text-center text-slate-400 font-semibold">មិនទាន់មានចុះឈ្មោះភ្ញៀវក្នុងកម្មវិធីនេះឡើយ។</td></tr>`;
+                return;
+            }
+
+            filtered.forEach((g, index) => {
+                const r = document.createElement('tr');
+                r.className = 'hover:bg-slate-50 transition-colors border-b border-slate-100';
+                r.innerHTML = `
+                    <td class="py-3 px-4 text-center text-slate-400 font-semibold">${index + 1}</td>
+                    <td class="py-3 px-4 font-bold text-slate-900">${g.name}</td>
+                    <td class="py-3 px-4 font-mono">${g.phone}</td>
+                    <td class="py-3 px-4 text-center font-bold">${g.companions} នាក់</td>
+                    <td class="py-3 px-4"><span class="px-2 py-0.5 rounded bg-slate-100 text-slate-700 font-bold text-[10px]">${g.relation_type}</span></td>
+                    <td class="py-3 px-4 text-right font-bold text-slate-800 font-mono">$${g.amount}</td>
+                    <td class="py-3 px-4 max-w-sm truncate italic text-slate-550" title="${g.note || ''}">${g.note || '-'}</td>
+                    <td class="py-3 px-4 text-center">
+                        <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold ${g.status === 'approved' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}">
+                            ${g.status === 'approved' ? 'យល់ព្រម' : 'រង់ចាំ'}
+                        </span>
+                    </td>
+                `;
+                tbody.appendChild(r);
+            });
+        }
+
+        // Trigger exports to Excel with xlsx CDN
+        function triggerExcelExport() {
+            if (!activeHostWedding) return;
+            const filtered = localGuests.filter(g => g.wedding_id == activeHostWedding.id);
+            
+            const data = filtered.map((g, index) => ({
+                "ល.រ (No.)": index + 1,
+                "ឈ្មោះភ្ញៀវ (Guest Name)": g.name,
+                "លេខទូរស័ព្ទ (Phone Number)": g.phone,
+                "ចំនួនអ្នកមកជាមួយ (Companions)": g.companions,
+                "ប្រភេទទំនាក់ទំនង (Relation)": g.relation_type,
+                "ទឹកប្រាក់ចងដៃ $ (Gift Amount)": g.amount,
+                "កំណត់សម្គាល់/ពរជ័យ (Notes)": g.note || '',
+                "ស្ថានភាព (Status)": g.status === 'approved' ? 'យល់ព្រម (Approved)' : 'រង់ចាំការបញ្ជាក់ (Pending)'
+            }));
+
+            const worksheet = XLSX.utils.json_to_sheet(data);
+            const workbook = XLSX.utils.book_new();
+            
+            XLSX.utils.book_append_sheet(workbook, worksheet, 'បញ្ជីឈ្មោះភ្ញៀវ');
+            XLSX.writeFile(workbook, `បញ្ជីភ្ញៀវ_${activeHostWedding.title.replace(/\s+/g, '_')}.xlsx`);
+        }
+
+        // Initialize App
+        window.addEventListener('load', () => {
+            initSupabase();
+            reloadData();
+        });
+    </script>
+</body>
+</html>
