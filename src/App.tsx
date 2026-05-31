@@ -26,11 +26,13 @@ import {
   Info,
   X,
   AlertTriangle,
-  QrCode
+  QrCode,
+  Download
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 // @ts-ignore
 import bakongLogo from "./bakong.webp";
+import QrInvitationScanner, { ScannedInvitation } from "./components/QrInvitationScanner";
 
 // ==========================================
 // Types & Schemas
@@ -140,10 +142,121 @@ const SEED_GUESTS: Guest[] = [
   }
 ];
 
+// ==========================================
+// SUPABASE SQL SCHEMA FOR REFERENCE & EASY COPYING
+// ==========================================
+const SUPABASE_SQL_SCHEMA = `-- =====================================================================
+-- SUPABASE POSTGRESQL SCHEMA SETUP SCRIPT
+-- =====================================================================
+-- Application: Wedding Guest Manager (Khmer Unicode Typography)
+-- Description: Create tables, enable RLS, and add public policies for easy prototyping.
+-- Location: /src/supabase_setup.sql
+-- =====================================================================
+
+-- 1. Create tables
+-- Admins table
+CREATE TABLE IF NOT EXISTS public.admins (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    username VARCHAR(100) UNIQUE NOT NULL,
+    password VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- Weddings table
+CREATE TABLE IF NOT EXISTS public.weddings (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    title VARCHAR(255) NOT NULL,
+    host_username VARCHAR(100) UNIQUE NOT NULL,
+    host_password VARCHAR(255) NOT NULL,
+    khqr_img_url TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- Guests table
+CREATE TABLE IF NOT EXISTS public.guests (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    wedding_id UUID REFERENCES public.weddings(id) ON DELETE CASCADE,
+    name VARCHAR(255) NOT NULL,
+    phone VARCHAR(100) NOT NULL,
+    companions INTEGER DEFAULT 0 NOT NULL,
+    relation_type VARCHAR(100) NOT NULL, -- e.g., 'ខាងកូនកំលោះ', 'ខាងកូនក្រមុំ', 'មិត្តភក្តិ', 'ផ្សេងៗ'
+    amount NUMERIC DEFAULT 0.00 NOT NULL,
+    note TEXT,
+    status VARCHAR(50) DEFAULT 'pending' NOT NULL, -- 'pending' or 'approved'
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- 2. Seed default admin (username: admin123, password: password123)
+-- Seed standard credentials for local or test environments
+INSERT INTO public.admins (username, password)
+VALUES ('admin123', 'password123')
+ON CONFLICT (username) DO NOTHING;
+
+-- Seed a default wedding event for testing (host_username: wedding123, host_password: host123)
+INSERT INTO public.weddings (title, host_username, host_password, khqr_img_url)
+VALUES (
+    'ពិធីសិរីសួស្តីអាពាហ៍ពិពាហ៍ សុខា និង ចិន្តា', 
+    'wedding123', 
+    'host123', 
+    'https://i.ibb.co/3s6qCg3/khqr-demo.png' -- ImgBB/Demo placeholder
+)
+ON CONFLICT (host_username) DO NOTHING;
+
+-- 3. Enable Row Level Security (RLS)
+ALTER TABLE public.admins ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.weddings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.guests ENABLE ROW LEVEL SECURITY;
+
+-- 4. Create Permissive Public Policies for Prototype Access
+-- Standard setup for dev/prototype clients using database anon/service keys
+
+-- Drop existing policies if they exist (to allow safe re-running of this script)
+DROP POLICY IF EXISTS "Allow public read on Admins" ON public.admins;
+DROP POLICY IF EXISTS "Allow public insert on Admins" ON public.admins;
+DROP POLICY IF EXISTS "Allow public update on Admins" ON public.admins;
+DROP POLICY IF EXISTS "Allow public delete on Admins" ON public.admins;
+
+DROP POLICY IF EXISTS "Allow public read on Weddings" ON public.weddings;
+DROP POLICY IF EXISTS "Allow public insert on Weddings" ON public.weddings;
+DROP POLICY IF EXISTS "Allow public update on Weddings" ON public.weddings;
+DROP POLICY IF EXISTS "Allow public delete on Weddings" ON public.weddings;
+
+DROP POLICY IF EXISTS "Allow public read on Guests" ON public.guests;
+DROP POLICY IF EXISTS "Allow public insert on Guests" ON public.guests;
+DROP POLICY IF EXISTS "Allow public update on Guests" ON public.guests;
+DROP POLICY IF EXISTS "Allow public delete on Guests" ON public.guests;
+
+-- Admins public policies
+CREATE POLICY "Allow public read on Admins" ON public.admins FOR SELECT USING (true);
+CREATE POLICY "Allow public insert on Admins" ON public.admins FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow public update on Admins" ON public.admins FOR UPDATE USING (true) WITH CHECK (true);
+CREATE POLICY "Allow public delete on Admins" ON public.admins FOR DELETE USING (true);
+
+-- Weddings public policies
+CREATE POLICY "Allow public read on Weddings" ON public.weddings FOR SELECT USING (true);
+CREATE POLICY "Allow public insert on Weddings" ON public.weddings FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow public update on Weddings" ON public.weddings FOR UPDATE USING (true) WITH CHECK (true);
+CREATE POLICY "Allow public delete on Weddings" ON public.weddings FOR DELETE USING (true);
+
+-- Guests public policies
+CREATE POLICY "Allow public read on Guests" ON public.guests FOR SELECT USING (true);
+CREATE POLICY "Allow public insert on Guests" ON public.guests FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow public update on Guests" ON public.guests FOR UPDATE USING (true) WITH CHECK (true);
+CREATE POLICY "Allow public delete on Guests" ON public.guests FOR DELETE USING (true);
+`;
+
 export default function App() {
   // ==========================================
   // States: Database Config
   // ==========================================
+  const [copiedSql, setCopiedSql] = useState<boolean>(false);
+  
+  const handleCopySql = () => {
+    navigator.clipboard.writeText(SUPABASE_SQL_SCHEMA);
+    setCopiedSql(true);
+    setTimeout(() => setCopiedSql(false), 2000);
+  };
+
   const [supabaseUrl, setSupabaseUrl] = useState<string>(() => {
     return (
       localStorage.getItem("wedding_supabase_url") ||
@@ -319,6 +432,22 @@ export default function App() {
   const [showRsvpSuccess, setShowRsvpSuccess] = useState(false);
   const [submittingRsvp, setSubmittingRsvp] = useState(false);
   const [lastSubmittedId, setLastSubmittedId] = useState<string | null>(null);
+
+  const [isQrScannerOpen, setIsQrScannerOpen] = useState(false);
+
+  const handleQrScanSuccess = (data: ScannedInvitation) => {
+    if (data.name) setGuestName(data.name);
+    if (data.phone) setGuestPhone(data.phone);
+    if (data.companions !== undefined) setGuestCompanions(data.companions);
+    if (data.relation_type) {
+      const allowedRelations = ["ខាងកូនកំលោះ", "ខាងកូនក្រមុំ", "មិត្តភក្តិ", "ផ្សេងៗ"];
+      if (allowedRelations.includes(data.relation_type)) {
+        setRelationType(data.relation_type);
+      }
+    }
+    if (data.amount !== undefined) setGiftAmount(String(data.amount));
+    if (data.note) setGuestNote(data.note);
+  };
 
   const handleGuestSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -771,6 +900,36 @@ export default function App() {
                   គម្រោងនេះអាចភ្ជាប់ទៅកាន់ <strong>Supabase Storage</strong> និង <strong>PostgreSQL Database</strong> ពិតប្រាកដ។ 
                   ប្រសិនបើលោកអ្នកគ្មានគណនី Supabase ទេលោកអ្នកអាចសាកល្បងដោយការចុចប៊ូតុង <strong>ប្រើប្រាស់ Demo Mode</strong> ដើម្បីសាកល្បងជាមួយទិន្នន័យគំរូក្នុង Browser របស់អ្នក។
                 </p>
+
+                {/* Show Copy SQL Schema Option */}
+                <div className="mt-4 p-3 bg-slate-850 border border-slate-800 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+                  <div className="flex flex-col">
+                    <span className="text-xs font-bold text-slate-200">Supabase SQL Schema</span>
+                    <span className="text-[10px] text-slate-400 mt-0.5">ចម្លងកូដ SQL ធៀបក្នុង SQL Editor របស់ Supabase</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleCopySql}
+                    className={`shrink-0 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all border duration-200 cursor-pointer ${
+                      copiedSql 
+                        ? "bg-emerald-600/20 text-emerald-400 border-emerald-500/30" 
+                        : "bg-slate-800 hover:bg-slate-750 text-slate-350 border-slate-700/60"
+                    }`}
+                  >
+                    {copiedSql ? (
+                      <>
+                        <Check className="w-3.5 h-3.5" />
+                        <span>បានចម្លងរួចរាល់!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Database className="w-3.5 h-3.5 text-blue-400" />
+                        <span>ចម្លង SQL Script</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+
                 {supabaseError && (
                   <div className="mt-3 p-2 text-xs bg-red-950 text-red-300 border border-red-800 rounded-lg flex items-start gap-1.5">
                     <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
@@ -884,9 +1043,19 @@ export default function App() {
                 
                 {/* Left Form Panel */}
                 <div className="md:col-span-7 bg-white border border-pink-100 rounded-3xl p-6 shadow-xs space-y-5">
-                  <h3 className="text-md font-bold text-slate-800 flex items-center gap-2 border-b border-pink-50 pb-3 font-serif">
-                    <Heart className="w-4.5 h-4.5 text-pink-500 fill-pink-500" /> បញ្ចូលព័ត៌មានចុះឈ្មោះកិត្តិយស
-                  </h3>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-pink-50 pb-3">
+                    <h3 className="text-md font-bold text-slate-800 flex items-center gap-2 font-serif">
+                      <Heart className="w-4.5 h-4.5 text-pink-500 fill-pink-500" /> បញ្ចូលព័ត៌មានចុះឈ្មោះកិត្តិយស
+                    </h3>
+                    <button
+                      type="button"
+                      onClick={() => setIsQrScannerOpen(true)}
+                      className="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-pink-50 to-rose-50 hover:from-pink-100 hover:to-rose-100 border border-pink-200/60 rounded-xl text-xs font-bold text-pink-700 hover:text-pink-800 shadow-3xs hover:shadow-2xs leading-none transition-all duration-200 cursor-pointer active:scale-95"
+                    >
+                      <QrCode className="w-4 h-4 text-pink-500 animate-pulse shrink-0" />
+                      <span>ស្កេនកាតអញ្ជើញ (Scan QR)</span>
+                    </button>
+                  </div>
 
                   <form onSubmit={handleGuestSubmit} className="space-y-4">
                     
@@ -1047,6 +1216,7 @@ export default function App() {
                   <div className="relative aspect-square max-w-xs mx-auto border-2 border-dashed border-pink-200 rounded-2xl overflow-hidden p-2 bg-pink-50/10 flex items-center justify-center">
                     {activeWedding?.khqr_img_url ? (
                       <img
+                        id="active-wedding-qr"
                         src={activeWedding.khqr_img_url}
                         alt="KHQR Code"
                         referrerPolicy="no-referrer"
@@ -1059,6 +1229,44 @@ export default function App() {
                       </div>
                     )}
                   </div>
+
+                  {/* Download QR Code Button */}
+                  {activeWedding?.khqr_img_url && (
+                    <div className="flex justify-center">
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          try {
+                            // Try to fetch image with CORS settings to force direct download
+                            const response = await fetch(activeWedding.khqr_img_url, { mode: "cors" });
+                            const blob = await response.blob();
+                            const blobUrl = window.URL.createObjectURL(blob);
+                            const link = document.createElement("a");
+                            link.href = blobUrl;
+                            link.download = `KHQR_${activeWedding.title.replace(/\s+/g, "_")}.png`;
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+                            window.URL.revokeObjectURL(blobUrl);
+                          } catch (err) {
+                            // CORS / network fallback - open directly
+                            const link = document.createElement("a");
+                            link.href = activeWedding.khqr_img_url;
+                            link.target = "_blank";
+                            link.rel = "noopener noreferrer";
+                            link.download = `KHQR_${activeWedding.title.replace(/\s+/g, "_")}.png`;
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+                          }
+                        }}
+                        className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-pink-50 to-rose-50 hover:from-pink-100 hover:to-rose-100 border border-pink-200/60 rounded-xl text-xs font-bold text-pink-700 hover:text-pink-800 shadow-3xs hover:shadow-2xs transition-all duration-200 cursor-pointer active:scale-[0.98]"
+                      >
+                        <Download className="w-4 h-4 text-pink-500 shrink-0" />
+                        <span>ទាញយករូបភាព QR Code (Download QR)</span>
+                      </button>
+                    </div>
+                  )}
 
                   <div className="bg-pink-50/30 border border-pink-100/60 p-4 rounded-2xl text-center">
                     <p className="text-xs text-slate-600 font-medium leading-relaxed">
@@ -1813,6 +2021,12 @@ export default function App() {
         <p className="font-medium text-slate-650 font-serif">© 2026 គ្រប់គ្រងសិទ្ធិដោយម្ចាស់ពិធីអាពាហ៍ពិពាហ៍</p>
         <p className="font-mono text-slate-400">Server Time: {DEFAULT_REAL_TIME} | Sandbox Active</p>
       </footer>
+
+      <QrInvitationScanner
+        isOpen={isQrScannerOpen}
+        onClose={() => setIsQrScannerOpen(false)}
+        onScanSuccess={handleQrScanSuccess}
+      />
 
     </div>
   );
